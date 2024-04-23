@@ -1,0 +1,17 @@
+<launch>
+
+  <node pkg="OneDayProject" type="vehicle_node.py" name="vehicle_node" output="screen"/>
+      <param name="map_path" value="$(find OneDayProject)/maps/"/>
+      <param name="SamplePath" value="$(find OneDayProject)/log/" />
+      <param name="SampleId" value= "1" />
+  
+  <node pkg="onedayalg" type="onedayalg_node" name="onedayalg_node" respawn="true" output="screen"/>
+      
+  <node pkg="rviz" type="rviz" name="my_rviz" args="-d $(find OneDayProject)/simulation.rviz" />
+  
+  <node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="teleop_twist_keyboard" respawn="true"/>
+  <param name="use_sim_time" value="False"/>
+
+  
+
+</launch>
