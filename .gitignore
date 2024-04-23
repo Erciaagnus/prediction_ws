@@ -1,0 +1,21 @@
+#devel
+devel/**
+
+#catkin_tools
+.catkin_tools/**
+
+#logs
+logs/**
+
+# VSCode
+.vscode/**
+.idea/**
+.cashe/**
+.history/**
+
+#windows
+.DS_Store
+.catkin_tools/profiles/default/devel_collisions.txt
+
+#build
+build/**

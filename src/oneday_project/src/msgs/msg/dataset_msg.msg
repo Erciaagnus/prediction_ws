@@ -1,0 +1,13 @@
+int32 id
+int32 lane_id
+float32 length
+float32 width
+float64[] x
+float64[] y
+float64[] yaw
+float64[] vx
+float64[] vy
+float64[] s
+float64[] d
+int32[] mask
+int32 mode
