@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import glob
 import scipy.io as sio
 import tf
-from scipy.stats import norm
+from scipy.stats import norm, multivariate_normal
 
 from geometry_msgs.msg import Twist, Point32, PolygonStamped, Polygon, Vector3, Pose, Quaternion, Point
 from visualization_msgs.msg import MarkerArray, Marker
@@ -34,7 +34,7 @@ class Environments(object):
         self.set_subscriber() # 키보드 입력을 받을 때, cmd_vel이라는 이름을 가지고 구독하게 됨.u:정지. k는 재시작
         self.set_publisher() #네모박스 띄우는 토픽, 각 오브젝트마다,,, 그리고 prediction 정보를 띄우는 토픽으로 이루어짐.
         self.load_map() # 맵 데이터를 로드하는 메소드를 호출
-        self.v_max=33
+
 
         r = rospy.Rate(20) # 초당 20회의 루프 실행률을 설정
         while not rospy.is_shutdown():
@@ -148,10 +148,12 @@ class Environments(object):
 
 
     def calculate_probability(self, d_lat, v, lane_width):
+        self.v_max=v
         mu_lc=-(2/lane_width)**2 * self.v_max*(d_lat-lane_width/2)**2+self.v_max
         mu_lk=-(2/lane_width)**2 * self.v_max*d_lat**2
+
         # Variance
-        sigma=2.0
+        sigma=1.1
         #P(A|C, M)
         # Normal Gaussian Probability Density Function
         p_lc_action = norm.pdf(v, mu_lc, sigma) # 속도에 대한 확률
@@ -167,15 +169,24 @@ class Environments(object):
 
         Objects = MarkerArray() # 차량 위치를 표시할 마커들과 텍스트 마커들을 저장할 배열을 각각 초기화..
         Texts = MarkerArray()
-        for i in range(len(self.vehicles)): # ㅏㅊ량 데이터를 순회.. 시뮬레이션에 포함된 모든 차량에 대해 반복 실행한다.
+        for i in range(len(self.vehicles)): # 차량 데이터를 순회.. 시뮬레이션에 포함된 모든 차량에 대해 반복 실행한다.
 
             veh_data = np.array(self.vehicles[i][self.time-10:self.time+1]) # 현재 시간을 기준으로 각 차량의 과거 10 타임스텝의 데이터를 배열로 추출
             #d_lat=veh_data[-1,3] # Latest d_lat
-            d_lat=np.diff(veh_data[:,3])
-            v=veh_data[-1,7]
             lane_width=3.85535188 # Lane Width
+            d_lat=abs(veh_data[-1,3])
+            if d_lat<lane_width:
+                d_lat=d_lat-lane_width/2
+            elif lane_width < d_lat and d_lat < 2*lane_width:
+                d_lat=d_lat-lane_width*1.5
+            elif 2*lane_width < d_lat and d_lat < 3*lane_width:
+                d_lat=d_lat-2.5*lane_width
 
+            print("d_lat", d_lat)
+            v=veh_data[-1,7]
             p_lc_action, p_lk_action, p_lk, p_lc=self.calculate_probability(d_lat, v, lane_width)
+            print("P(M|C): ", p_lc)
+            print("P(A|C, M)", p_lc_action)
             """
             To Do
             i번째 veh history data인 veh_data를 활용하여 LC intention에 대한 pred 수행
@@ -184,12 +195,14 @@ class Environments(object):
             # P(A|C,M)P(M|C)/SUM(P(A|C,M)) = P(M|A,C) # Select Maneuver
             pred_lc= p_lc_action*p_lc/(p_lc_action+p_lk_action)
             pred_lk= p_lk_action*p_lk/(p_lk_action+p_lc_action)
+            print("prediction of lk", pred_lk)
+            print("prediction of LC", pred_lc)
 
 
             pred  = "LC" if np.argmax([pred_lk , pred_lc])==1 else "LK"
             # 실제 동작 정보,,, 차량의 실제 동작 값을 기반으로 실제 동작을 결정한다.
             gt = "LC" if self.vehicles[i][self.time][9] == 1 else "LK"
-
+            rospy.loginfo("Vehicle ID: {}, GT: {}, Pred: {}, P_LC: {:.4f}, P_LK: {:.4f}".format(i, gt, pred, pred_lc, pred_lk))
             # 차량의 방향을 포현하기 위한 쿼터니언을 계산한다.
             q = tf.transformations.quaternion_from_euler(0, 0, self.vehicles[i][self.time][6])
 
